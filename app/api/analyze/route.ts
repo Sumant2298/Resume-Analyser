@@ -9,6 +9,86 @@ const MAX_CHARS = 12000;
 type SalaryRange = { min: number; max: number } | null;
 type ScoreInput = number | null | undefined;
 
+type ScorePart = {
+  matched: number;
+  total: number;
+  ratio: number;
+  weight: number;
+};
+
+type ScoreBreakdown = {
+  requirements: ScorePart;
+  responsibilities: ScorePart;
+  preferred: ScorePart;
+  other: ScorePart;
+};
+
+const STOPWORDS = new Set([
+  "the",
+  "and",
+  "for",
+  "with",
+  "that",
+  "this",
+  "from",
+  "your",
+  "you",
+  "our",
+  "are",
+  "will",
+  "can",
+  "able",
+  "ability",
+  "work",
+  "works",
+  "working",
+  "role",
+  "responsible",
+  "responsibilities",
+  "requirements",
+  "qualification",
+  "qualifications",
+  "skills",
+  "skill",
+  "years",
+  "year",
+  "experience",
+  "including",
+  "strong",
+  "good",
+  "great",
+  "excellent",
+  "knowledge",
+  "understanding",
+  "proficient",
+  "preferred",
+  "plus",
+  "bonus",
+  "day",
+  "team",
+  "teams",
+  "collaborate",
+  "collaboration",
+  "develop",
+  "design",
+  "build",
+  "building",
+  "deliver",
+  "delivery",
+  "ensure",
+  "using",
+  "use",
+  "used",
+  "within",
+  "across",
+  "multiple",
+  "ability",
+  "self",
+  "starter",
+  "must",
+  "nice"
+]);
+
 function normalizeWeight(value: number, fallback: number) {
   if (!Number.isFinite(value) || value <= 0 || value >= 1) return fallback;
   return value;
@@ -153,41 +233,174 @@ function safeJsonParse(text: string) {
   }
 }
 
-function tokenize(text: string) {
+function normalizeTech(text: string) {
   return text
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((word) => word.length > 2);
+    .replace(/c\+\+/gi, "cplusplus")
+    .replace(/c#/gi, "csharp")
+    .replace(/\.net/gi, "dotnet")
+    .replace(/node\.js/gi, "nodejs")
+    .replace(/react\.js/gi, "react");
 }
 
-function heuristicAnalysis(cvText: string, jdText: string) {
-  const jdTokens = new Set(tokenize(jdText));
+function tokenize(text: string) {
+  return normalizeTech(text)
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .map((word) => word.trim())
+    .filter((word) => word.length > 2 && !STOPWORDS.has(word));
+}
+
+function splitJDSections(jdText: string) {
+  const sections = {
+    requirements: "",
+    responsibilities: "",
+    preferred: "",
+    other: ""
+  };
+
+  const reqPattern =
+    /\b(requirements|qualifications|must have|what you bring|skills)\b/i;
+  const respPattern =
+    /\b(responsibilities|what you'll do|what you will do|role|day[- ]to[- ]day)\b/i;
+  const prefPattern = /\b(nice to have|preferred|bonus|plus|good to have)\b/i;
+
+  let current: keyof typeof sections = "other";
+  const lines = jdText.split(/\n+/);
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (reqPattern.test(trimmed)) {
+      current = "requirements";
+      continue;
+    }
+    if (respPattern.test(trimmed)) {
+      current = "responsibilities";
+      continue;
+    }
+    if (prefPattern.test(trimmed)) {
+      current = "preferred";
+      continue;
+    }
+    sections[current] += ` ${trimmed}`;
+  }
+
+  return sections;
+}
+
+function coverageScore(sectionText: string, cvTokens: Set<string>) {
+  const tokens = Array.from(new Set(tokenize(sectionText)));
+  if (tokens.length === 0) {
+    return { matched: 0, total: 0, ratio: 0 };
+  }
+  const matched = tokens.reduce(
+    (count, token) => (cvTokens.has(token) ? count + 1 : count),
+    0
+  );
+  return { matched, total: tokens.length, ratio: matched / tokens.length };
+}
+
+function computeMatchScore(cvText: string, jdText: string) {
   const cvTokens = new Set(tokenize(cvText));
-  const matches: string[] = [];
-  const missing: string[] = [];
+  const sections = splitJDSections(jdText);
+
+  const reqScore = coverageScore(sections.requirements, cvTokens);
+  const respScore = coverageScore(sections.responsibilities, cvTokens);
+  const prefScore = coverageScore(sections.preferred, cvTokens);
+  const otherScore = coverageScore(sections.other, cvTokens);
+
+  const weights = {
+    requirements: 0.6,
+    responsibilities: 0.25,
+    preferred: 0.15,
+    other: 0.1
+  };
+
+  const breakdown: ScoreBreakdown = {
+    requirements: { ...reqScore, weight: weights.requirements },
+    responsibilities: { ...respScore, weight: weights.responsibilities },
+    preferred: { ...prefScore, weight: weights.preferred },
+    other: { ...otherScore, weight: weights.other }
+  };
+
+  const activeParts = Object.entries(breakdown).filter(
+    ([, value]) => value.total > 0
+  );
+
+  if (activeParts.length === 0) {
+    const fallback = coverageScore(jdText, cvTokens);
+    return {
+      score: Math.round(fallback.ratio * 100),
+      breakdown: {
+        requirements: { ...fallback, weight: 1 },
+        responsibilities: { matched: 0, total: 0, ratio: 0, weight: 0 },
+        preferred: { matched: 0, total: 0, ratio: 0, weight: 0 },
+        other: { matched: 0, total: 0, ratio: 0, weight: 0 }
+      }
+    };
+  }
+
+  const weightSum = activeParts.reduce((sum, [, value]) => sum + value.weight, 0);
+  const weightedScore = activeParts.reduce((sum, [, value]) => {
+    const adjustedWeight = weightSum > 0 ? value.weight / weightSum : 0;
+    return sum + value.ratio * adjustedWeight;
+  }, 0);
+
+  return {
+    score: Math.round(weightedScore * 100),
+    breakdown
+  };
+}
+
+function extractKeywordStats(jdText: string, cvText: string) {
+  const jdTokens = tokenize(jdText);
+  const cvTokens = new Set(tokenize(cvText));
+  const freq = new Map<string, number>();
 
   for (const token of jdTokens) {
+    freq.set(token, (freq.get(token) || 0) + 1);
+  }
+
+  const sortedTokens = Array.from(freq.entries())
+    .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)
+    .map(([token]) => token);
+
+  const keywordMatches: string[] = [];
+  const missingKeywords: string[] = [];
+
+  for (const token of sortedTokens) {
     if (cvTokens.has(token)) {
-      matches.push(token);
+      keywordMatches.push(token);
     } else {
-      missing.push(token);
+      missingKeywords.push(token);
     }
   }
 
-  const score = Math.round((matches.length / Math.max(1, jdTokens.size)) * 100);
+  return {
+    keywordMatches: keywordMatches.slice(0, 30),
+    missingKeywords: missingKeywords.slice(0, 30)
+  };
+}
+
+function heuristicAnalysis(cvText: string, jdText: string) {
+  const { score, breakdown } = computeMatchScore(cvText, jdText);
+  const keywords = extractKeywordStats(jdText, cvText);
 
   return {
     matchScore: score,
+    scoreBreakdown: breakdown,
     summary:
       "Heuristic analysis (no LLM key found). Configure GROQ_API_KEY for deeper insights.",
-    gapAnalysis: missing.slice(0, 10).map((word) => `Missing keyword: ${word}`),
+    gapAnalysis: keywords.missingKeywords
+      .slice(0, 10)
+      .map((word) => `Missing keyword: ${word}`),
     improvements: [
       "Add missing role-specific keywords from the job description.",
       "Quantify impact in bullet points (metrics, outcomes, scale).",
       "Align your summary with the role's core responsibilities."
     ],
-    keywordMatches: matches.slice(0, 30),
-    missingKeywords: missing.slice(0, 30),
+    keywordMatches: keywords.keywordMatches,
+    missingKeywords: keywords.missingKeywords,
     bulletRewrites: [],
     atsNotes: [
       "Use standard section headings (Experience, Skills, Education).",
@@ -210,10 +423,10 @@ async function analyzeWithLLM(
 
   const systemPrompt =
     "You are a senior recruiter and ATS specialist. Return ONLY valid JSON with this schema: " +
-    "{ matchScore: number (0-100), summary: string, gapAnalysis: string[], improvements: string[], " +
+    "{ summary: string, gapAnalysis: string[], improvements: string[], " +
     "keywordMatches: string[], missingKeywords: string[], bulletRewrites: string[], atsNotes: string[], " +
     "compensationFit: number | null, compensationNotes: string[] }." +
-    "Match score is a percentage based on fit to the JD. " +
+    "Do NOT compute a match score; it is computed separately. " +
     "Write improvements as action-oriented imperatives (start with a verb). " +
     "Gap analysis should be short phrases. Bullet rewrites must be concise, impact-focused.";
 
@@ -312,6 +525,19 @@ export async function POST(req: Request) {
       salaryContextParts.join("\n")
     );
 
+    const match = computeMatchScore(cvText, jdText);
+    const keywordStats = extractKeywordStats(jdText, cvText);
+
+    analysis.matchScore = match.score;
+    analysis.scoreBreakdown = match.breakdown;
+
+    if (!Array.isArray(analysis.keywordMatches) || analysis.keywordMatches.length === 0) {
+      analysis.keywordMatches = keywordStats.keywordMatches;
+    }
+    if (!Array.isArray(analysis.missingKeywords) || analysis.missingKeywords.length === 0) {
+      analysis.missingKeywords = keywordStats.missingKeywords;
+    }
+
     if (analysis.compensationFit === undefined || analysis.compensationFit === null) {
       analysis.compensationFit = compensation.score;
     }
@@ -331,7 +557,8 @@ export async function POST(req: Request) {
       analysis,
       meta: {
         cvChars: cvText.length,
-        jdChars: jdText.length
+        jdChars: jdText.length,
+        scoreBreakdown: match.breakdown
       }
     });
   } catch (error) {

@@ -15,12 +15,28 @@ type Analysis = {
   compensationFit?: number | null;
   compensationNotes?: string[];
   overallScore?: number | null;
+  scoreBreakdown?: ScoreBreakdown;
   raw?: string;
+};
+
+type ScorePart = {
+  matched: number;
+  total: number;
+  ratio: number;
+  weight: number;
+};
+
+type ScoreBreakdown = {
+  requirements?: ScorePart;
+  responsibilities?: ScorePart;
+  preferred?: ScorePart;
+  other?: ScorePart;
 };
 
 type Meta = {
   cvChars: number;
   jdChars: number;
+  scoreBreakdown?: ScoreBreakdown;
 };
 
 type InputMode = "file" | "text";
@@ -51,6 +67,11 @@ const buildActionItems = (analysis: Analysis) => {
   return Array.from(new Set(items)).slice(0, 8);
 };
 
+const formatCoverage = (part?: ScorePart) => {
+  if (!part || part.total === 0) return "N/A";
+  return `${Math.round(part.ratio * 100)}% (${part.matched}/${part.total})`;
+};
+
 const buildMarkdown = (analysis: Analysis, meta?: Meta) => {
   const actionItems = buildActionItems(analysis);
   const lines = [
@@ -70,6 +91,13 @@ const buildMarkdown = (analysis: Analysis, meta?: Meta) => {
     analysis.summary ? `Summary: ${analysis.summary}` : "",
     "",
     meta ? `Resume chars: ${meta.cvChars} | JD chars: ${meta.jdChars}` : "",
+    "",
+    "## Score Breakdown",
+    `Requirements coverage: ${formatCoverage(meta?.scoreBreakdown?.requirements)}`,
+    `Responsibilities coverage: ${formatCoverage(
+      meta?.scoreBreakdown?.responsibilities
+    )}`,
+    `Preferred coverage: ${formatCoverage(meta?.scoreBreakdown?.preferred)}`,
     "",
     "## Compensation Notes",
     ...(Array.isArray(analysis.compensationNotes)
@@ -617,6 +645,25 @@ export default function Home() {
                 </p>
               </div>
             </div>
+
+            {meta?.scoreBreakdown && (
+              <div className="mt-4 grid gap-2 text-xs text-ink/70">
+                <div className="flex items-center justify-between rounded-xl bg-white/70 px-3 py-2">
+                  <span>Requirements coverage</span>
+                  <span>{formatCoverage(meta.scoreBreakdown.requirements)}</span>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-white/70 px-3 py-2">
+                  <span>Responsibilities coverage</span>
+                  <span>
+                    {formatCoverage(meta.scoreBreakdown.responsibilities)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-white/70 px-3 py-2">
+                  <span>Preferred coverage</span>
+                  <span>{formatCoverage(meta.scoreBreakdown.preferred)}</span>
+                </div>
+              </div>
+            )}
 
             {!analysis && (
               <div className="mt-6 rounded-2xl border border-dashed border-ink/20 p-6 text-sm text-ink/60">
