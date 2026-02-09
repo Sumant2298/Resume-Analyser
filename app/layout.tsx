@@ -1,6 +1,5 @@
 import "./globals.css";
 import { Space_Grotesk, Fraunces } from "next/font/google";
-import Providers from "./providers";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -28,7 +27,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${spaceGrotesk.variable} ${fraunces.variable}`}>
       <body>
-        <Providers>{children}</Providers>
+        {children}
       </body>
     </html>
   );

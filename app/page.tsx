@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { PDFDocument, StandardFonts } from "pdf-lib";
-import { signIn, signOut, useSession } from "next-auth/react";
 
 type Analysis = {
   matchScore?: number;
@@ -104,7 +103,6 @@ const buildMarkdown = (analysis: Analysis, meta?: Meta) => {
 };
 
 export default function Home() {
-  const { data: session } = useSession();
   const [cvMode, setCvMode] = useState<InputMode>("file");
   const [jdMode, setJdMode] = useState<InputMode>("text");
   const [cvFile, setCvFile] = useState<File | null>(null);
@@ -119,17 +117,6 @@ export default function Home() {
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [freeUsed, setFreeUsed] = useState(false);
-
-  useEffect(() => {
-    const count = Number(localStorage.getItem("analysis_count") || "0");
-    setFreeUsed(count >= 1);
-  }, []);
-
-  const canAnalyze = useMemo(() => {
-    if (session) return true;
-    return !freeUsed;
-  }, [session, freeUsed]);
 
   const actionItems = useMemo(
     () => (analysis ? buildActionItems(analysis) : []),
@@ -149,11 +136,6 @@ export default function Home() {
     setError(null);
     setAnalysis(null);
     setMeta(null);
-
-    if (!canAnalyze) {
-    setError("Free analysis used. Sign in with Google to continue.");
-      return;
-    }
 
     if (cvMode === "file" && !cvFile) {
       setError("Please upload a resume file.");
@@ -195,12 +177,6 @@ export default function Home() {
         setAnalysis(data.analysis);
         setMeta(data.meta);
 
-        if (!session) {
-          const count = Number(localStorage.getItem("analysis_count") || "0");
-          const nextCount = count + 1;
-          localStorage.setItem("analysis_count", String(nextCount));
-          setFreeUsed(nextCount >= 1);
-        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unexpected error");
@@ -313,21 +289,9 @@ export default function Home() {
               Resume Analyser · ATS‑aware insights
             </div>
             <div className="flex items-center gap-3">
-              {session ? (
-                <button
-                  onClick={() => signOut()}
-                  className="rounded-full border border-ink/20 bg-white/80 px-4 py-2 text-sm"
-                >
-                  Sign out
-                </button>
-              ) : (
-                <button
-                  onClick={() => signIn("google")}
-                  className="rounded-full border border-ink/20 bg-white/80 px-4 py-2 text-sm"
-                >
-                  Sign in with Google
-                </button>
-              )}
+              <div className="rounded-full border border-ink/10 bg-white/80 px-4 py-2 text-xs text-ink/70">
+                No login required
+              </div>
             </div>
           </div>
           <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
@@ -337,8 +301,8 @@ export default function Home() {
               </h1>
               <p className="max-w-xl text-lg text-ink/70">
                 Upload or paste your resume and JD to get a match score, salary
-                fit, and an action‑oriented checklist. One free analysis, then
-                Google sign‑in to continue.
+                fit, and an action‑oriented checklist. Unlimited analyses with
+                no login required.
               </p>
               <div className="flex flex-wrap gap-3 text-sm text-ink/70">
                 <span className="tag rounded-full px-3 py-1">PDF · DOCX · Text</span>

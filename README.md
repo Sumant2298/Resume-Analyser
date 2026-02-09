@@ -1,14 +1,13 @@
 # Resume Analyser (MVP)
 
-Upload a resume + JD, get a match score, compensation fit, gap analysis, and actionable resume improvements. Includes a one‑free‑analysis gate and Google OAuth for additional analyses.
+Upload a resume + JD, get a match score, compensation fit, gap analysis, and actionable resume improvements. Unlimited analyses with no login required.
 
 ## Stack
 - Next.js (App Router)
 - Tailwind CSS
-- NextAuth (Google OAuth)
+- No authentication required
 - Groq API (free tier, OpenAI‑compatible)
 - PDF/DOCX parsing via `pdf-parse` + `mammoth`
-- Postgres + Prisma (server‑side usage limits)
 
 ## Setup
 
@@ -21,29 +20,17 @@ npm install
 ```bash
 GROQ_API_KEY=YOUR_GROQ_KEY
 GROQ_MODEL=llama-3.1-8b-instant
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=REPLACE_ME
-GOOGLE_ID=YOUR_GOOGLE_OAUTH_CLIENT_ID
-GOOGLE_SECRET=YOUR_GOOGLE_OAUTH_CLIENT_SECRET
-DATABASE_URL=postgresql://user:pass@host:5432/dbname
-RATE_LIMIT_SALT=LONG_RANDOM_STRING
 SKILL_WEIGHT=0.8
 ```
 
-3) Run migrations + generate Prisma client
-```bash
-npm run prisma:generate
-npm run prisma:migrate
-```
-
-4) Run
+3) Run
 ```bash
 npm run dev
 ```
 
 ## Notes
 - Resume/JD files are processed in memory only and not stored on the server.
-- One free analysis is enforced server‑side by IP hash. Authenticated users are unlimited.
+- Unlimited analyses; no login required.
 - Report downloads are available in Markdown and PDF.
 - Render deployment: set the env vars above and use `npm run build` + `npm run start`.
 - Overall score uses `SKILL_WEIGHT` for the match score and `1 - SKILL_WEIGHT` for salary fit.
@@ -53,8 +40,7 @@ npm run dev
 - Build command: `npm run build`
 - Start command: `npm run start`
 - Add env vars from `.env.local` in the Render dashboard.
-- Add a Postgres instance in Render and copy its `DATABASE_URL`.
-- `render.yaml` runs `npx prisma migrate deploy` during the build.
+- Use the included `render.yaml` blueprint for easy deployment.
 
 ### Render Blueprint
 This repo includes a `render.yaml` blueprint. You can deploy with it and then fill in the secret env vars in the Render UI.

@@ -1,10 +1,5 @@
 import pdf from "pdf-parse";
 import mammoth from "mammoth";
-import crypto from "crypto";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/db";
-import { Prisma } from "@prisma/client";
 
 export const runtime = "nodejs";
 
@@ -97,35 +92,6 @@ function computeCompensationFit(
   return { score: Math.max(0, Math.min(100, score)), notes };
 }
 
-function getClientIp(req: Request) {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) {
-    return forwarded.split(",")[0]?.trim();
-  }
-  return req.headers.get("x-real-ip") || req.headers.get("cf-connecting-ip");
-}
-
-function hashIp(ip: string) {
-  const salt = process.env.RATE_LIMIT_SALT;
-  if (!salt) {
-    throw new Error("RATE_LIMIT_SALT is not configured.");
-  }
-  return crypto.createHmac("sha256", salt).update(ip).digest("hex");
-}
-
-async function ensureUsageTable() {
-  await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "Usage" (
-    "id" TEXT NOT NULL,
-    "ipHash" TEXT NOT NULL,
-    "count" INTEGER NOT NULL DEFAULT 0,
-    "firstSeenAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "lastUsedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "Usage_pkey" PRIMARY KEY ("id")
-  );`);
-  await prisma.$executeRawUnsafe(
-    `CREATE UNIQUE INDEX IF NOT EXISTS "Usage_ipHash_key" ON "Usage"("ipHash");`
-  );
-}
 
 function getExtension(name: string) {
   const parts = name.split(".");
@@ -295,49 +261,6 @@ async function analyzeWithLLM(
 
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    let ipHash: string | null = null;
-
-    if (!session) {
-      if (!process.env.DATABASE_URL) {
-        return Response.json(
-          { error: "DATABASE_URL is not configured for usage limits." },
-          { status: 500 }
-        );
-      }
-
-      const ip = getClientIp(req);
-      if (!ip) {
-        return Response.json(
-          { error: "Unable to verify usage limit. Missing client IP." },
-          { status: 400 }
-        );
-      }
-
-      ipHash = hashIp(ip);
-      let usage = null;
-      try {
-        usage = await prisma.usage.findUnique({ where: { ipHash } });
-      } catch (error) {
-        if (
-          error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === "P2021"
-        ) {
-          await ensureUsageTable();
-          usage = await prisma.usage.findUnique({ where: { ipHash } });
-        } else {
-          throw error;
-        }
-      }
-
-      if (usage && usage.count >= 1) {
-        return Response.json(
-          { error: "Free analysis used. Sign in with Google to continue." },
-          { status: 403 }
-        );
-      }
-    }
-
     const formData = await req.formData();
 
     const cvTextInput = (formData.get("cvText") as string | null) || "";
@@ -403,14 +326,6 @@ export async function POST(req: Request) {
       analysis.matchScore,
       analysis.compensationFit
     );
-
-    if (!session && ipHash) {
-      await prisma.usage.upsert({
-        where: { ipHash },
-        update: { count: { increment: 1 } },
-        create: { ipHash, count: 1 }
-      });
-    }
 
     return Response.json({
       analysis,
