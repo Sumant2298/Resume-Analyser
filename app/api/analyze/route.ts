@@ -288,8 +288,21 @@ function splitJDSections(jdText: string) {
   return sections;
 }
 
-function coverageScore(sectionText: string, cvTokens: Set<string>) {
-  const tokens = Array.from(new Set(tokenize(sectionText)));
+function uniqueTokens(text: string) {
+  return Array.from(new Set(tokenize(text)));
+}
+
+function buildSectionTokens(jdText: string) {
+  const sections = splitJDSections(jdText);
+  return {
+    requirements: uniqueTokens(sections.requirements),
+    responsibilities: uniqueTokens(sections.responsibilities),
+    preferred: uniqueTokens(sections.preferred),
+    other: uniqueTokens(sections.other)
+  };
+}
+
+function coverageScore(tokens: string[], cvTokens: Set<string>) {
   if (tokens.length === 0) {
     return { matched: 0, total: 0, ratio: 0 };
   }
@@ -302,12 +315,12 @@ function coverageScore(sectionText: string, cvTokens: Set<string>) {
 
 function computeMatchScore(cvText: string, jdText: string) {
   const cvTokens = new Set(tokenize(cvText));
-  const sections = splitJDSections(jdText);
+  const sectionTokens = buildSectionTokens(jdText);
 
-  const reqScore = coverageScore(sections.requirements, cvTokens);
-  const respScore = coverageScore(sections.responsibilities, cvTokens);
-  const prefScore = coverageScore(sections.preferred, cvTokens);
-  const otherScore = coverageScore(sections.other, cvTokens);
+  const reqScore = coverageScore(sectionTokens.requirements, cvTokens);
+  const respScore = coverageScore(sectionTokens.responsibilities, cvTokens);
+  const prefScore = coverageScore(sectionTokens.preferred, cvTokens);
+  const otherScore = coverageScore(sectionTokens.other, cvTokens);
 
   const weights = {
     requirements: 0.6,
@@ -328,9 +341,10 @@ function computeMatchScore(cvText: string, jdText: string) {
   );
 
   if (activeParts.length === 0) {
-    const fallback = coverageScore(jdText, cvTokens);
+    const fallback = coverageScore(uniqueTokens(jdText), cvTokens);
     return {
       score: Math.round(fallback.ratio * 100),
+      sectionTokens,
       breakdown: {
         requirements: { ...fallback, weight: 1 },
         responsibilities: { matched: 0, total: 0, ratio: 0, weight: 0 },
@@ -348,7 +362,8 @@ function computeMatchScore(cvText: string, jdText: string) {
 
   return {
     score: Math.round(weightedScore * 100),
-    breakdown
+    breakdown,
+    sectionTokens
   };
 }
 
@@ -383,12 +398,13 @@ function extractKeywordStats(jdText: string, cvText: string) {
 }
 
 function heuristicAnalysis(cvText: string, jdText: string) {
-  const { score, breakdown } = computeMatchScore(cvText, jdText);
+  const { score, breakdown, sectionTokens } = computeMatchScore(cvText, jdText);
   const keywords = extractKeywordStats(jdText, cvText);
 
   return {
     matchScore: score,
     scoreBreakdown: breakdown,
+    sectionTokens,
     summary:
       "Heuristic analysis (no LLM key found). Configure GROQ_API_KEY for deeper insights.",
     gapAnalysis: keywords.missingKeywords
@@ -527,9 +543,17 @@ export async function POST(req: Request) {
 
     const match = computeMatchScore(cvText, jdText);
     const keywordStats = extractKeywordStats(jdText, cvText);
+    const keySkills = Array.from(
+      new Set([
+        ...match.sectionTokens.requirements,
+        ...match.sectionTokens.responsibilities
+      ])
+    );
+    const bonusSkills = Array.from(new Set(match.sectionTokens.preferred));
 
     analysis.matchScore = match.score;
     analysis.scoreBreakdown = match.breakdown;
+    analysis.sectionTokens = match.sectionTokens;
 
     if (!Array.isArray(analysis.keywordMatches) || analysis.keywordMatches.length === 0) {
       analysis.keywordMatches = keywordStats.keywordMatches;
@@ -558,7 +582,11 @@ export async function POST(req: Request) {
       meta: {
         cvChars: cvText.length,
         jdChars: jdText.length,
-        scoreBreakdown: match.breakdown
+        scoreBreakdown: match.breakdown,
+        skillBuckets: {
+          keySkills: keySkills.slice(0, 80),
+          bonusSkills: bonusSkills.slice(0, 40)
+        }
       }
     });
   } catch (error) {
