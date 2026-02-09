@@ -19,6 +19,8 @@ type Analysis = {
   matchedCategories?: string[];
   missingCategories?: string[];
   bonusCategories?: string[];
+  keywordMatches?: string[];
+  missingKeywords?: string[];
   raw?: string;
 };
 
@@ -39,6 +41,13 @@ const formatCategory = (category: string) =>
     .replace(/[_/]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+
+const getMatchLabel = (score: number) => {
+  if (score >= 80) return "Good Match";
+  if (score >= 60) return "Moderate Match";
+  if (score >= 40) return "Partial Match";
+  return "Low Match";
+};
 
 const buildMarkdown = (analysis: Analysis, meta?: Meta) => {
   const lines = [
@@ -86,53 +95,114 @@ const buildMarkdown = (analysis: Analysis, meta?: Meta) => {
   return lines.filter(Boolean).join("\n");
 };
 
-const ProgressRing = ({ value }: { value: number }) => {
-  const size = 140;
-  const stroke = 10;
-  const radius = (size - stroke) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const progress = Math.max(0, Math.min(100, value));
-  const offset = circumference - (progress / 100) * circumference;
-
+const MatchCircle = ({ score }: { score: number }) => {
   return (
-    <div className="relative flex h-36 w-36 items-center justify-center">
-      <svg width={size} height={size} className="-rotate-90">
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke="rgba(255,255,255,0.2)"
-          strokeWidth={stroke}
-          fill="transparent"
-        />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke="url(#scoreGradient)"
-          strokeWidth={stroke}
-          fill="transparent"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-        />
-        <defs>
-          <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#ff9a7b" />
-            <stop offset="50%" stopColor="#ffd36b" />
-            <stop offset="100%" stopColor="#7dd3fc" />
-          </linearGradient>
-        </defs>
-      </svg>
-      <div className="absolute text-center text-white">
-        <p className="text-3xl font-semibold">{progress}%</p>
-        <p className="text-xs uppercase tracking-[0.2em] text-white/70">
-          Match
-        </p>
-      </div>
+    <div className="flex h-44 w-44 flex-col items-center justify-center rounded-full bg-[#FFF6BF] shadow-inner">
+      <p className="text-4xl font-semibold text-amber-700">{score}%</p>
+      <p className="mt-1 text-sm font-semibold text-amber-700">
+        {getMatchLabel(score)}
+      </p>
     </div>
   );
 };
+
+const StatCard = ({
+  value,
+  label,
+  accent,
+  icon,
+  muted
+}: {
+  value: string;
+  label: string;
+  accent: string;
+  icon: JSX.Element;
+  muted?: boolean;
+}) => (
+  <div className={`rounded-2xl ${accent} px-6 py-5 text-center`}>
+    <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-white shadow">
+      {icon}
+    </div>
+    <p
+      className={`text-2xl font-semibold ${
+        muted ? "text-slate-400" : "text-slate-900"
+      }`}
+    >
+      {value}
+    </p>
+    <p className="text-xs text-slate-600">{label}</p>
+  </div>
+);
+
+const Chip = ({ label, tone }: { label: string; tone: string }) => (
+  <span className={`rounded-full px-3 py-1 text-xs font-medium ${tone}`}>
+    {label}
+  </span>
+);
+
+const TargetIcon = () => (
+  <svg viewBox="0 0 24 24" className="h-5 w-5 text-blue-600" fill="none">
+    <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" />
+    <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2" />
+    <circle cx="12" cy="12" r="1" fill="currentColor" />
+  </svg>
+);
+
+const BriefcaseIcon = () => (
+  <svg viewBox="0 0 24 24" className="h-5 w-5 text-purple-600" fill="none">
+    <path
+      d="M9 7V6a3 3 0 0 1 6 0v1"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <rect
+      x="4"
+      y="7"
+      width="16"
+      height="12"
+      rx="2"
+      stroke="currentColor"
+      strokeWidth="2"
+    />
+    <path
+      d="M4 12h16"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+const BookIcon = () => (
+  <svg viewBox="0 0 24 24" className="h-5 w-5 text-indigo-600" fill="none">
+    <path
+      d="M5 5.5C5 4.1 6.1 3 7.5 3H20v16H7.5C6.1 19 5 17.9 5 16.5V5.5Z"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M5 6h11"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+const BadgeIcon = () => (
+  <svg viewBox="0 0 24 24" className="h-5 w-5 text-emerald-600" fill="none">
+    <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="2" />
+    <path
+      d="M8.5 13.5 7 21l5-3 5 3-1.5-7.5"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
 
 export default function ResultsPage() {
   const router = useRouter();
@@ -165,6 +235,8 @@ export default function ResultsPage() {
   const matchedCategories = analysis?.matchedCategories || [];
   const missingCategories = analysis?.missingCategories || [];
   const bonusCategories = analysis?.bonusCategories || [];
+  const keywordMatches = analysis?.keywordMatches || [];
+  const missingKeywords = analysis?.missingKeywords || [];
 
   const suggestions = useMemo(() => {
     if (!analysis) return [];
@@ -173,14 +245,35 @@ export default function ResultsPage() {
       : analysis.improvements || [];
   }, [analysis]);
 
-  const rewriteSuggestions = useMemo(() => {
-    if (!analysis) return [];
-    const rewrites = analysis.bulletRewrites || [];
-    if (rewrites.length > 0) return rewrites.slice(0, 5);
-    return (analysis.improvements || []).slice(0, 5);
-  }, [analysis]);
+  const matchScore = Math.max(0, Math.min(100, analysis?.matchScore ?? 0));
+  const keywordTotal = keywordMatches.length + missingKeywords.length;
+  const keywordScore =
+    keywordTotal > 0
+      ? Math.round((keywordMatches.length / keywordTotal) * 100)
+      : null;
 
-  const scoreValue = analysis?.overallScore ?? analysis?.matchScore ?? 0;
+  const strengths = useMemo(() => {
+    if (matchedCategories.length === 0) return ["No strong skill alignment yet."];
+    return [
+      `Strong skill alignment with ${matchedCategories
+        .slice(0, 3)
+        .map(formatCategory)
+        .join(", ")}.`,
+      `Matched ${matchedCategories.length} of ${keyCategories.length} key categories.`
+    ];
+  }, [matchedCategories, keyCategories.length]);
+
+  const improvements = useMemo(() => {
+    if (missingCategories.length === 0) {
+      return ["Minor areas for improvement."];
+    }
+    return [
+      `Missing ${missingCategories.length} key categories: ${missingCategories
+        .slice(0, 3)
+        .map(formatCategory)
+        .join(", ")}.`
+    ];
+  }, [missingCategories]);
 
   const downloadReport = () => {
     if (!analysis) return;
@@ -259,13 +352,13 @@ export default function ResultsPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-950 px-6 pb-16 pt-16 sm:px-10">
-        <div className="mx-auto max-w-3xl rounded-3xl bg-white/90 p-8 text-center">
+      <div className="min-h-screen px-6 pb-16 pt-16 sm:px-10">
+        <div className="mx-auto max-w-3xl rounded-3xl bg-white p-8 text-center shadow-lg">
           <h1 className="font-display text-3xl">No analysis found</h1>
-          <p className="mt-3 text-sm text-ink/60">{error}</p>
+          <p className="mt-3 text-sm text-slate-600">{error}</p>
           <button
             onClick={handleReset}
-            className="mt-6 rounded-full bg-ink px-5 py-2 text-sm text-white"
+            className="mt-6 rounded-full bg-blue-600 px-5 py-2 text-sm text-white"
           >
             Start a new analysis
           </button>
@@ -276,319 +369,255 @@ export default function ResultsPage() {
 
   if (!analysis) {
     return (
-      <div className="min-h-screen bg-slate-950 px-6 pb-16 pt-16 sm:px-10">
-        <div className="mx-auto max-w-3xl rounded-3xl bg-white/90 p-8 text-center">
-          <p className="text-sm text-ink/60">Loading your analysis...</p>
+      <div className="min-h-screen px-6 pb-16 pt-16 sm:px-10">
+        <div className="mx-auto max-w-3xl rounded-3xl bg-white p-8 text-center shadow-lg">
+          <p className="text-sm text-slate-600">Loading your analysis...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-950 text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(109,87,255,0.45),_transparent_55%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_40%,_rgba(243,87,168,0.3),_transparent_50%)]" />
-      <div className="absolute inset-0 bg-gradient-to-br from-[#4b3cf5] via-[#6d50ff] to-[#f357a8] opacity-90" />
-      <div className="relative">
-        <div className="mx-auto max-w-6xl px-6 pb-20 pt-12 sm:px-10">
-          <header className="flex flex-col gap-8">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs uppercase tracking-[0.2em]">
-                Resume Analyser · Results
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={downloadReport}
-                  className="rounded-full border border-white/30 bg-white/10 px-4 py-2 text-xs"
-                >
-                  Download MD
-                </button>
-                <button
-                  onClick={downloadReportPdf}
-                  className="rounded-full border border-white/30 bg-white/10 px-4 py-2 text-xs"
-                >
-                  Download PDF
-                </button>
-                <button
-                  onClick={handleReset}
-                  className="rounded-full bg-white px-4 py-2 text-xs text-[#4b3cf5]"
-                >
-                  New analysis
-                </button>
-              </div>
-            </div>
+    <div className="min-h-screen px-6 pb-16 pt-12 sm:px-10">
+      <div className="mx-auto flex max-w-6xl flex-col gap-8">
+        <section className="soft-card px-8 py-10">
+          <div className="text-center">
+            <h1 className="font-display text-3xl font-semibold text-slate-900">
+              Analysis Complete
+            </h1>
+            <p className="mt-2 text-sm text-slate-500">
+              Here&apos;s how well your CV matches the job description
+            </p>
+          </div>
 
-            <div className="grid gap-8 lg:grid-cols-[auto_1fr]">
-              <div className="rounded-[32px] border border-white/15 bg-white/10 p-6 shadow-2xl">
-                <ProgressRing value={scoreValue} />
-                <p className="mt-4 text-center text-xs uppercase tracking-[0.2em] text-white/70">
-                  Match score
+          <div className="mt-8 flex justify-center">
+            <MatchCircle score={matchScore} />
+          </div>
+
+          <div className="mt-8 grid gap-4 md:grid-cols-4">
+            <StatCard
+              value={`${matchScore}%`}
+              label="Skills Match"
+              accent="bg-blue-50"
+              icon={<TargetIcon />}
+            />
+            <StatCard
+              value="--"
+              label="Experience"
+              accent="bg-purple-50"
+              icon={<BriefcaseIcon />}
+              muted
+            />
+            <StatCard
+              value={keywordScore === null ? "--" : `${keywordScore}%`}
+              label="Keywords"
+              accent="bg-indigo-50"
+              icon={<BookIcon />}
+              muted={keywordScore === null}
+            />
+            <StatCard
+              value="--"
+              label="Education"
+              accent="bg-emerald-50"
+              icon={<BadgeIcon />}
+              muted
+            />
+          </div>
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-2">
+          <div className="soft-card p-6">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                ✓
+              </span>
+              <h2 className="text-xl font-semibold text-slate-900">Strengths</h2>
+            </div>
+            <ul className="mt-4 space-y-3 text-sm text-slate-600">
+              {strengths.map((item, index) => (
+                <li key={`strength-${index}`} className="flex items-start gap-3">
+                  <span className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                    ✓
+                  </span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="soft-card p-6">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                ⚠
+              </span>
+              <h2 className="text-xl font-semibold text-slate-900">
+                Areas for Improvement
+              </h2>
+            </div>
+            <ul className="mt-4 space-y-3 text-sm text-slate-600">
+              {improvements.map((item, index) => (
+                <li key={`improve-${index}`} className="flex items-start gap-3">
+                  <span className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                    !
+                  </span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-2">
+          <div className="soft-card p-6">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                ✓
+              </span>
+              <h2 className="text-xl font-semibold text-slate-900">
+                Matched Skills ({matchedCategories.length})
+              </h2>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {matchedCategories.length === 0 && (
+                <p className="text-sm text-slate-500">
+                  No matching skills detected.
                 </p>
-              </div>
-              <div className="space-y-4">
-                <h1 className="font-display text-4xl font-semibold sm:text-5xl">
-                  Analysis Complete
-                </h1>
-                <p className="max-w-2xl text-sm text-white/80">
-                  Your match score is based on the top 6 skill categories from
-                  the JD. Use the plan below to close gaps quickly.
+              )}
+              {matchedCategories.map((category) => (
+                <Chip
+                  key={`match-${category}`}
+                  label={formatCategory(category)}
+                  tone="bg-emerald-100 text-emerald-700"
+                />
+              ))}
+            </div>
+          </div>
+          <div className="soft-card p-6">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+                ✕
+              </span>
+              <h2 className="text-xl font-semibold text-slate-900">
+                Missing Skills ({missingCategories.length})
+              </h2>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {missingCategories.length === 0 && (
+                <p className="text-sm text-slate-500">
+                  No missing skills — great job!
                 </p>
-                <div className="flex flex-wrap gap-3 text-xs">
-                  <span className="rounded-full bg-white/15 px-4 py-2">
-                    Key categories: {matchedCategories.length}/{keyCategories.length}
-                  </span>
-                  <span className="rounded-full bg-white/15 px-4 py-2">
-                    Missing: {missingCategories.length}
-                  </span>
-                  <span className="rounded-full bg-white/15 px-4 py-2">
-                    Bonus: {bonusCategories.length}
-                  </span>
-                </div>
-              </div>
+              )}
+              {missingCategories.map((category) => (
+                <Chip
+                  key={`missing-${category}`}
+                  label={formatCategory(category)}
+                  tone="bg-rose-100 text-rose-700"
+                />
+              ))}
             </div>
-          </header>
+          </div>
+        </section>
 
-          <section className="mt-10 grid gap-4 md:grid-cols-4">
-            <div className="rounded-3xl bg-white/95 p-4 text-slate-900 shadow-xl">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                Overall
+        <section className="soft-card p-6">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+              +
+            </span>
+            <h2 className="text-xl font-semibold text-slate-900">
+              Bonus Skills ({bonusCategories.length})
+            </h2>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {bonusCategories.length === 0 && (
+              <p className="text-sm text-slate-500">
+                No bonus skills detected yet.
               </p>
-              <p className="mt-2 text-2xl font-semibold">
-                {analysis.overallScore ?? analysis.matchScore ?? "--"}%
-              </p>
-              <span className="mt-2 inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs text-emerald-700">
-                Calibrated
-              </span>
-            </div>
-            <div className="rounded-3xl bg-white/95 p-4 text-slate-900 shadow-xl">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                Category match
-              </p>
-              <p className="mt-2 text-2xl font-semibold">
-                {analysis.matchScore ?? "--"}%
-              </p>
-              <span className="mt-2 inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs text-blue-600">
-                Top 6 categories
-              </span>
-            </div>
-            <div className="rounded-3xl bg-white/95 p-4 text-slate-900 shadow-xl">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                Key gaps
-              </p>
-              <p className="mt-2 text-2xl font-semibold">
-                {missingCategories.length}
-              </p>
-              <span className="mt-2 inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs text-amber-700">
-                Focus these first
-              </span>
-            </div>
-            <div className="rounded-3xl bg-white/95 p-4 text-slate-900 shadow-xl">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                Bonus skills
-              </p>
-              <p className="mt-2 text-2xl font-semibold">
-                {bonusCategories.length}
-              </p>
-              <span className="mt-2 inline-flex rounded-full bg-purple-100 px-3 py-1 text-xs text-purple-700">
-                Differentiators
-              </span>
-            </div>
-          </section>
+            )}
+            {bonusCategories.map((category) => (
+              <Chip
+                key={`bonus-${category}`}
+                label={formatCategory(category)}
+                tone="bg-sky-100 text-sky-700"
+              />
+            ))}
+          </div>
+        </section>
 
-          <section className="mt-10 grid gap-6 lg:grid-cols-3">
-            <div className="rounded-3xl bg-white/95 p-6 text-slate-900 shadow-xl">
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
-                  ✓
-                </span>
-                <div>
-                  <p className="text-lg font-semibold">Matched categories</p>
-                  <p className="text-xs text-slate-500">
-                    Top categories already demonstrated in your resume.
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {matchedCategories.length === 0 && (
-                  <span className="text-xs text-slate-500">
-                    No matching categories detected.
-                  </span>
-                )}
-                {matchedCategories.map((category) => (
-                  <span
-                    key={`match-${category}`}
-                    className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs text-emerald-700"
-                  >
-                    {formatCategory(category)}
-                  </span>
-                ))}
-              </div>
+        <section className="soft-card p-6">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+              🧳
+            </span>
+            <h2 className="text-xl font-semibold text-slate-900">
+              Experience Analysis
+            </h2>
+          </div>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-xs text-slate-500">Required Experience</p>
+              <p className="text-sm font-semibold text-slate-900">Not specified</p>
             </div>
-            <div className="rounded-3xl bg-white/95 p-6 text-slate-900 shadow-xl">
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-100 text-rose-600">
-                  ✕
-                </span>
-                <div>
-                  <p className="text-lg font-semibold">Missing key categories</p>
-                  <p className="text-xs text-slate-500">
-                    Categories required by the JD but missing in your resume.
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {missingCategories.length === 0 && (
-                  <span className="text-xs text-slate-500">
-                    No missing categories detected.
-                  </span>
-                )}
-                {missingCategories.map((category) => (
-                  <span
-                    key={`missing-${category}`}
-                    className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs text-rose-700"
-                  >
-                    {formatCategory(category)}
-                  </span>
-                ))}
-              </div>
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-xs text-slate-500">Your Experience</p>
+              <p className="text-sm font-semibold text-slate-900">Not specified</p>
             </div>
-            <div className="rounded-3xl bg-white/95 p-6 text-slate-900 shadow-xl">
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-100 text-blue-600">
-                  +
-                </span>
-                <div>
-                  <p className="text-lg font-semibold">Bonus categories</p>
-                  <p className="text-xs text-slate-500">
-                    Extra strengths beyond the top 6 categories.
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {bonusCategories.length === 0 && (
-                  <span className="text-xs text-slate-500">
-                    No bonus categories found.
-                  </span>
-                )}
-                {bonusCategories.map((category) => (
-                  <span
-                    key={`bonus-${category}`}
-                    className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs text-blue-700"
-                  >
-                    {formatCategory(category)}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </section>
+          </div>
+          <div
+            className={`mt-4 rounded-2xl p-4 text-sm ${
+              missingCategories.length === 0
+                ? "bg-emerald-50 text-emerald-700"
+                : "bg-amber-50 text-amber-700"
+            }`}
+          >
+            {missingCategories.length === 0
+              ? "Your experience meets the job requirements"
+              : "Highlight projects that cover the missing categories"}
+          </div>
+        </section>
 
-          <section className="mt-10 rounded-[32px] bg-white/95 p-8 text-slate-900 shadow-xl">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-display text-2xl">Skill categories (top 6)</h2>
-              <span className="text-xs text-slate-500">
-                Dynamic categories extracted from the JD.
-              </span>
-            </div>
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              {keyCategories.map((category) => {
-                const isMatched = matchedCategories.some(
-                  (item) => item.toLowerCase() === category.toLowerCase()
-                );
-
-                return (
-                  <div
-                    key={category}
-                    className="rounded-2xl border border-slate-200 bg-white p-4"
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className="font-semibold">{formatCategory(category)}</p>
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs ${
-                          isMatched
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-rose-100 text-rose-700"
-                        }`}
-                      >
-                        {isMatched ? "Matched" : "Missing"}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-xs text-slate-500">
-                      {isMatched
-                        ? "Evidence found in your resume."
-                        : "Add evidence or keywords to cover this category."}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-
-          <section className="mt-10 grid gap-6">
-            <div className="rounded-[32px] bg-white/95 p-8 text-slate-900 shadow-xl">
-              <div className="flex items-center gap-3">
-                <span className="text-xl">✨</span>
-                <h2 className="font-display text-2xl">Improvement suggestions</h2>
+        <section className="rounded-3xl bg-[#2F5BFF] px-6 py-5 text-white shadow-lg">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15">
+              💡
+            </span>
+            <h2 className="text-xl font-semibold">Recommendations</h2>
+          </div>
+          <div className="mt-4 space-y-3">
+            {suggestions.length === 0 && (
+              <div className="rounded-2xl bg-white/15 px-4 py-3 text-sm">
+                No recommendations yet. Run another analysis.
               </div>
-
-              <div className="mt-6 grid gap-4">
-                {suggestions.length === 0 && (
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <p className="text-sm text-slate-600">
-                      Run another analysis to generate tailored suggestions.
-                    </p>
-                  </div>
-                )}
-                {suggestions.map((item, index) => (
-                  <div
-                    key={`suggestion-${index}`}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-sm font-semibold text-slate-800">
-                        {index + 1}
-                      </div>
-                      <div className="space-y-2">
-                        <p className="text-sm text-slate-700">{item}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+            )}
+            {suggestions.map((item, index) => (
+              <div
+                key={`recommend-${index}`}
+                className="rounded-2xl bg-white/15 px-4 py-3 text-sm"
+              >
+                {index + 1}. {item}
               </div>
-            </div>
+            ))}
+          </div>
+        </section>
 
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div className="rounded-[32px] bg-white/95 p-6 text-slate-900 shadow-xl">
-                <h2 className="font-display text-2xl">Rewrite playbook</h2>
-                <p className="text-xs text-slate-500">
-                  Direct bullet updates you can paste into the resume.
-                </p>
-                <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-slate-700">
-                  {rewriteSuggestions.length === 0 && (
-                    <li>No rewrite suggestions yet. Try again with more detail.</li>
-                  )}
-                  {rewriteSuggestions.map((item, index) => (
-                    <li key={`rewrite-${index}`}>{item}</li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="rounded-[32px] bg-white/95 p-6 text-slate-900 shadow-xl">
-                <h2 className="font-display text-2xl">Other tips</h2>
-                <p className="text-xs text-slate-500">
-                  ATS and recruiter tips that improve readability.
-                </p>
-                <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-slate-700">
-                  {(analysis.atsNotes || []).length === 0 && (
-                    <li>Keep sections clear with standard headings.</li>
-                  )}
-                  {(analysis.atsNotes || []).map((note, index) => (
-                    <li key={`note-${index}`}>{note}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </section>
-        </div>
+        <section className="flex flex-wrap justify-center gap-3">
+          <button
+            onClick={downloadReport}
+            className="rounded-full border border-slate-200 bg-white px-6 py-2 text-sm text-slate-700"
+          >
+            Download Markdown
+          </button>
+          <button
+            onClick={downloadReportPdf}
+            className="rounded-full border border-slate-200 bg-white px-6 py-2 text-sm text-slate-700"
+          >
+            Download PDF
+          </button>
+          <button
+            onClick={handleReset}
+            className="rounded-full bg-blue-600 px-6 py-2 text-sm text-white"
+          >
+            Analyze Another CV
+          </button>
+        </section>
       </div>
     </div>
   );
