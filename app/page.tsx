@@ -545,11 +545,6 @@ export default function Home() {
               >
                 {loading ? "Analyzing..." : "Analyze Resume"}
               </button>
-              {!canAnalyze && (
-                <span className="text-xs text-ink/60">
-                  Free analysis used. Sign in to continue.
-                </span>
-              )}
               {analysis && (
                 <>
                   <button
