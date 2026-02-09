@@ -54,7 +54,7 @@ npm run dev
 - Start command: `npm run start`
 - Add env vars from `.env.local` in the Render dashboard.
 - Add a Postgres instance in Render and copy its `DATABASE_URL`.
-- Run `npx prisma migrate deploy` in Render (or add as a build step).
+- `render.yaml` runs `npx prisma migrate deploy` during the build.
 
 ### Render Blueprint
 This repo includes a `render.yaml` blueprint. You can deploy with it and then fill in the secret env vars in the Render UI.
