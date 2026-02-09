@@ -41,6 +41,10 @@ type Meta = {
   skillBuckets?: {
     keySkills?: string[];
     bonusSkills?: string[];
+    keyMatched?: string[];
+    keyMissing?: string[];
+    bonusMatched?: string[];
+    bonusMissing?: string[];
   };
 };
 
@@ -376,16 +380,11 @@ export default function ResultsPage() {
     [analysis]
   );
 
-  const keySkills = meta?.skillBuckets?.keySkills || [];
-  const bonusSkills = meta?.skillBuckets?.bonusSkills || [];
-
-  const matchedSet = new Set(analysis?.keywordMatches || []);
-  const missingSet = new Set(analysis?.missingKeywords || []);
-
-  const matchingSkills = keySkills.filter((skill) => matchedSet.has(skill));
-  const missingKeySkills = keySkills.filter((skill) => missingSet.has(skill));
-  const bonusMatched = bonusSkills.filter((skill) => matchedSet.has(skill));
-  const bonusMissing = bonusSkills.filter((skill) => missingSet.has(skill));
+  const matchingSkills = meta?.skillBuckets?.keyMatched || [];
+  const missingKeySkills = meta?.skillBuckets?.keyMissing || [];
+  const bonusMatched = meta?.skillBuckets?.bonusMatched || [];
+  const bonusMissing = meta?.skillBuckets?.bonusMissing || [];
+  const bonusSkills = [...bonusMatched, ...bonusMissing];
 
   const matchingByCategory = useMemo(
     () => categorizeSkills(matchingSkills),
@@ -396,8 +395,8 @@ export default function ResultsPage() {
     [missingKeySkills]
   );
   const bonusByCategory = useMemo(
-    () => categorizeSkills([...bonusMatched, ...bonusMissing]),
-    [bonusMatched, bonusMissing]
+    () => categorizeSkills(bonusSkills),
+    [bonusSkills]
   );
 
   const rewriteSuggestions = useMemo(() => {

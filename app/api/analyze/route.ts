@@ -550,6 +550,11 @@ export async function POST(req: Request) {
       ])
     );
     const bonusSkills = Array.from(new Set(match.sectionTokens.preferred));
+    const cvTokenSet = new Set(tokenize(cvText));
+    const keyMatched = keySkills.filter((skill) => cvTokenSet.has(skill));
+    const keyMissing = keySkills.filter((skill) => !cvTokenSet.has(skill));
+    const bonusMatched = bonusSkills.filter((skill) => cvTokenSet.has(skill));
+    const bonusMissing = bonusSkills.filter((skill) => !cvTokenSet.has(skill));
 
     analysis.matchScore = match.score;
     analysis.scoreBreakdown = match.breakdown;
@@ -585,7 +590,11 @@ export async function POST(req: Request) {
         scoreBreakdown: match.breakdown,
         skillBuckets: {
           keySkills: keySkills.slice(0, 80),
-          bonusSkills: bonusSkills.slice(0, 40)
+          bonusSkills: bonusSkills.slice(0, 40),
+          keyMatched: keyMatched.slice(0, 80),
+          keyMissing: keyMissing.slice(0, 80),
+          bonusMatched: bonusMatched.slice(0, 40),
+          bonusMissing: bonusMissing.slice(0, 40)
         }
       }
     });
