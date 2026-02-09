@@ -1,11 +1,11 @@
 # Resume Analyser (MVP)
 
-Upload a resume + JD, get a match score, compensation fit, gap analysis, and actionable resume improvements. Includes a one‑free‑analysis gate and GitHub OAuth for additional analyses.
+Upload a resume + JD, get a match score, compensation fit, gap analysis, and actionable resume improvements. Includes a one‑free‑analysis gate and Google OAuth for additional analyses.
 
 ## Stack
 - Next.js (App Router)
 - Tailwind CSS
-- NextAuth (GitHub OAuth)
+- NextAuth (Google OAuth)
 - Groq API (free tier, OpenAI‑compatible)
 - PDF/DOCX parsing via `pdf-parse` + `mammoth`
 - Postgres + Prisma (server‑side usage limits)
@@ -23,8 +23,8 @@ GROQ_API_KEY=YOUR_GROQ_KEY
 GROQ_MODEL=llama-3.1-8b-instant
 NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=REPLACE_ME
-GITHUB_ID=YOUR_GITHUB_OAUTH_CLIENT_ID
-GITHUB_SECRET=YOUR_GITHUB_OAUTH_CLIENT_SECRET
+GOOGLE_ID=YOUR_GOOGLE_OAUTH_CLIENT_ID
+GOOGLE_SECRET=YOUR_GOOGLE_OAUTH_CLIENT_SECRET
 DATABASE_URL=postgresql://user:pass@host:5432/dbname
 RATE_LIMIT_SALT=LONG_RANDOM_STRING
 SKILL_WEIGHT=0.8

@@ -26,7 +26,34 @@ type Meta = {
 
 type InputMode = "file" | "text";
 
+const cleanGap = (item: string) =>
+  item.replace(/^Missing keyword:\s*/i, "").replace(/\.$/, "").trim();
+
+const buildActionItems = (analysis: Analysis) => {
+  const items: string[] = [];
+
+  for (const improvement of analysis.improvements || []) {
+    items.push(`Do: ${improvement}`);
+  }
+
+  for (const gap of (analysis.gapAnalysis || []).slice(0, 6)) {
+    const keyword = cleanGap(gap);
+    if (keyword) {
+      items.push(`Add evidence for ${keyword} (project, metric, or tool).`);
+    } else {
+      items.push(`Close gap: ${gap}`);
+    }
+  }
+
+  for (const rewrite of (analysis.bulletRewrites || []).slice(0, 3)) {
+    items.push(`Rewrite a bullet: ${rewrite}`);
+  }
+
+  return Array.from(new Set(items)).slice(0, 8);
+};
+
 const buildMarkdown = (analysis: Analysis, meta?: Meta) => {
+  const actionItems = buildActionItems(analysis);
   const lines = [
     "# Resume Analyser Report",
     "",
@@ -43,7 +70,7 @@ const buildMarkdown = (analysis: Analysis, meta?: Meta) => {
     }`,
     analysis.summary ? `Summary: ${analysis.summary}` : "",
     "",
-            meta ? `Resume chars: ${meta.cvChars} | JD chars: ${meta.jdChars}` : "",
+    meta ? `Resume chars: ${meta.cvChars} | JD chars: ${meta.jdChars}` : "",
     "",
     "## Compensation Notes",
     ...(Array.isArray(analysis.compensationNotes)
@@ -56,6 +83,9 @@ const buildMarkdown = (analysis: Analysis, meta?: Meta) => {
     "",
     "## Improvements",
     ...(analysis.improvements || []).map((item) => `- ${item}`),
+    "",
+    "## Action Plan",
+    ...actionItems.map((item) => `- ${item}`),
     "",
     "## Keyword Matches",
     ...(analysis.keywordMatches || []).map((item) => `- ${item}`),
@@ -101,13 +131,27 @@ export default function Home() {
     return !freeUsed;
   }, [session, freeUsed]);
 
+  const actionItems = useMemo(
+    () => (analysis ? buildActionItems(analysis) : []),
+    [analysis]
+  );
+
+  const priorityFixes = useMemo(() => {
+    if (!analysis) return [];
+    const gaps = (analysis.gapAnalysis || []).map((item) => cleanGap(item));
+    const missing = analysis.missingKeywords || [];
+    return Array.from(new Set([...gaps, ...missing]))
+      .filter(Boolean)
+      .slice(0, 6);
+  }, [analysis]);
+
   const handleAnalyze = async () => {
     setError(null);
     setAnalysis(null);
     setMeta(null);
 
     if (!canAnalyze) {
-      setError("Free analysis used. Sign in with GitHub to continue.");
+    setError("Free analysis used. Sign in with Google to continue.");
       return;
     }
 
@@ -172,7 +216,7 @@ export default function Home() {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = "cv-analysis-report.md";
+    anchor.download = "resume-analysis-report.md";
     anchor.click();
     URL.revokeObjectURL(url);
   };
@@ -235,7 +279,7 @@ export default function Home() {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = "cv-analysis-report.pdf";
+    anchor.download = "resume-analysis-report.pdf";
     anchor.click();
     URL.revokeObjectURL(url);
   };
@@ -272,16 +316,16 @@ export default function Home() {
               {session ? (
                 <button
                   onClick={() => signOut()}
-                  className="rounded-full border border-ink/20 px-4 py-2 text-sm"
+                  className="rounded-full border border-ink/20 bg-white/80 px-4 py-2 text-sm"
                 >
                   Sign out
                 </button>
               ) : (
                 <button
-                  onClick={() => signIn("github")}
-                  className="rounded-full border border-ink/20 px-4 py-2 text-sm"
+                  onClick={() => signIn("google")}
+                  className="rounded-full border border-ink/20 bg-white/80 px-4 py-2 text-sm"
                 >
-                  Sign in with GitHub
+                  Sign in with Google
                 </button>
               )}
             </div>
@@ -289,16 +333,16 @@ export default function Home() {
           <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="space-y-4">
               <h1 className="font-display text-4xl font-semibold leading-tight text-ink sm:text-5xl">
-                Pinpoint the gap between your resume and the job description.
+                Turn your resume into a job‑ready action plan.
               </h1>
               <p className="max-w-xl text-lg text-ink/70">
-                Upload or paste your resume and JD to get a match score, compensation
-                fit, targeted gaps, and crisp improvements. One free analysis,
-                then GitHub sign‑in to continue.
+                Upload or paste your resume and JD to get a match score, salary
+                fit, and an action‑oriented checklist. One free analysis, then
+                Google sign‑in to continue.
               </p>
               <div className="flex flex-wrap gap-3 text-sm text-ink/70">
                 <span className="tag rounded-full px-3 py-1">PDF · DOCX · Text</span>
-                <span className="tag rounded-full px-3 py-1">Gap analysis</span>
+                <span className="tag rounded-full px-3 py-1">Action plan</span>
                 <span className="tag rounded-full px-3 py-1">Salary fit</span>
                 <span className="tag rounded-full px-3 py-1">ATS‑ready tips</span>
               </div>
@@ -307,19 +351,19 @@ export default function Home() {
               <div className="absolute -right-12 -top-10 h-36 w-36 rounded-full bg-aqua/60 blur-2xl" />
               <div className="absolute -bottom-10 left-10 h-32 w-32 rounded-full bg-coral/60 blur-2xl" />
               <div className="relative space-y-4">
-                <h2 className="font-display text-2xl">Why it helps</h2>
+                <h2 className="font-display text-2xl">What you get</h2>
                 <p className="text-sm text-ink/70">
-                  Quickly surface missing keywords and role expectations. You
-                  control the inputs. Files are processed in memory only.
+                  A prioritized action plan, rewrite suggestions, and ATS‑ready
+                  guidance. Files are processed in memory only.
                 </p>
                 <div className="grid gap-3 text-sm">
                   <div className="rounded-2xl bg-white/80 p-4">
-                    <p className="font-semibold">Match score</p>
-                    <p className="text-ink/70">Percentage fit to the JD.</p>
+                    <p className="font-semibold">Scoreboard</p>
+                    <p className="text-ink/70">Overall fit + salary alignment.</p>
                   </div>
                   <div className="rounded-2xl bg-white/80 p-4">
-                    <p className="font-semibold">Rewrite suggestions</p>
-                    <p className="text-ink/70">Sharper bullets and impact metrics.</p>
+                    <p className="font-semibold">Action checklist</p>
+                    <p className="text-ink/70">Exactly what to fix next.</p>
                   </div>
                 </div>
               </div>
@@ -337,7 +381,7 @@ export default function Home() {
             <div className="mt-6 grid gap-6">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Resume</h3>
+                  <h3 className="text-lg font-semibold">Resume (Step 1)</h3>
                   <div className="flex gap-2 text-xs">
                     <button
                       onClick={() => setCvMode("file")}
@@ -403,7 +447,7 @@ export default function Home() {
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Job Description</h3>
+                  <h3 className="text-lg font-semibold">Job Description (Step 2)</h3>
                   <div className="flex gap-2 text-xs">
                     <button
                       onClick={() => setJdMode("file")}
@@ -533,7 +577,7 @@ export default function Home() {
               <button
                 onClick={handleAnalyze}
                 disabled={loading}
-                className="rounded-full bg-ink px-6 py-3 text-sm text-white disabled:opacity-60"
+                className="rounded-full bg-gradient-to-r from-midnight to-berry px-6 py-3 text-sm text-white shadow-lg shadow-berry/20 disabled:opacity-60"
               >
                 {loading ? "Analyzing..." : "Analyze Resume"}
               </button>
@@ -581,12 +625,39 @@ export default function Home() {
                     <span className="rounded-full bg-berry/10 px-3 py-1 text-sm">
                       Salary fit {analysis.compensationFit}%
                     </span>
-                  )}
+                )}
               </div>
             </div>
             <p className="text-sm text-ink/60">
-              Structured output with actionable guidance.
+              Structured output with an action‑first plan.
             </p>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <div className="glow-card rounded-2xl p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-ink/50">
+                  Overall
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-ink">
+                  {analysis?.overallScore ?? "--"}%
+                </p>
+              </div>
+              <div className="glow-card rounded-2xl p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-ink/50">
+                  Match
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-ink">
+                  {analysis?.matchScore ?? "--"}%
+                </p>
+              </div>
+              <div className="glow-card rounded-2xl p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-ink/50">
+                  Salary Fit
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-ink">
+                  {analysis?.compensationFit ?? "--"}%
+                </p>
+              </div>
+            </div>
 
             {!analysis && (
               <div className="mt-6 rounded-2xl border border-dashed border-ink/20 p-6 text-sm text-ink/60">
@@ -600,6 +671,33 @@ export default function Home() {
                   <div>
                     <h3 className="text-base font-semibold">Summary</h3>
                     <p className="text-ink/70">{analysis.summary}</p>
+                  </div>
+                )}
+
+                {actionItems.length > 0 && (
+                  <div>
+                    <h3 className="text-base font-semibold">Action Plan</h3>
+                    <ol className="mt-2 list-decimal space-y-2 pl-5 text-ink/70">
+                      {actionItems.map((item, index) => (
+                        <li key={`action-${index}`}>{item}</li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+
+                {priorityFixes.length > 0 && (
+                  <div>
+                    <h3 className="text-base font-semibold">Priority Fixes</h3>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {priorityFixes.map((item, index) => (
+                        <span
+                          key={`priority-${index}`}
+                          className="rounded-full bg-blush/60 px-3 py-1 text-xs"
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
 

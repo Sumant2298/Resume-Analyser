@@ -14,7 +14,7 @@ body {
   margin: 0;
   font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
   color: #0b0c10;
-  background: radial-gradient(circle at top, #f6f1e8 0%, #eef3f6 45%, #dbe9ee 100%);
+  background: radial-gradient(circle at top, #f7f3ea 0%, #eef3f6 40%, #dbe9ee 100%);
   min-height: 100vh;
 }
 
@@ -34,6 +34,12 @@ button {
   backdrop-filter: blur(18px);
   border: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
+}
+
+.glow-card {
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 28px 60px rgba(15, 23, 42, 0.12);
 }
 
 .tag {

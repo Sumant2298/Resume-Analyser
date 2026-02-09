@@ -14,9 +14,9 @@ services:
         sync: false
       - key: NEXTAUTH_URL
         sync: false
-      - key: GITHUB_ID
+      - key: GOOGLE_ID
         sync: false
-      - key: GITHUB_SECRET
+      - key: GOOGLE_SECRET
         sync: false
       - key: RATE_LIMIT_SALT
         sync: false

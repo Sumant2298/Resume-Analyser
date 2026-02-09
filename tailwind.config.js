@@ -9,7 +9,11 @@ export default {
         mist: "#dde7ea",
         aqua: "#35c9b0",
         coral: "#f08a5d",
-        berry: "#7b2cbf"
+        berry: "#7b2cbf",
+        midnight: "#0f172a",
+        lime: "#9ae66e",
+        sky: "#7dd3fc",
+        blush: "#fcd6cc"
       },
       fontFamily: {
         sans: ["var(--font-sans)"],

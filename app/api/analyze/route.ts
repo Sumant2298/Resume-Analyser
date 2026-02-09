@@ -247,7 +247,9 @@ async function analyzeWithLLM(
     "{ matchScore: number (0-100), summary: string, gapAnalysis: string[], improvements: string[], " +
     "keywordMatches: string[], missingKeywords: string[], bulletRewrites: string[], atsNotes: string[], " +
     "compensationFit: number | null, compensationNotes: string[] }." +
-    "Match score is a percentage based on fit to the JD.";
+    "Match score is a percentage based on fit to the JD. " +
+    "Write improvements as action-oriented imperatives (start with a verb). " +
+    "Gap analysis should be short phrases. Bullet rewrites must be concise, impact-focused.";
 
   const userPrompt = `RESUME:\n"""\n${cvText}\n"""\n\nJOB DESCRIPTION:\n"""\n${jdText}\n"""\n\nSALARY CONTEXT:\n${salaryContext}`;
 
@@ -330,7 +332,7 @@ export async function POST(req: Request) {
 
       if (usage && usage.count >= 1) {
         return Response.json(
-          { error: "Free analysis used. Sign in with GitHub to continue." },
+          { error: "Free analysis used. Sign in with Google to continue." },
           { status: 403 }
         );
       }
